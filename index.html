@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tạp Hóa Việt - Quản lý cửa hàng</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Be Vietnam Pro"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7f0',
+                            100: '#dcf0dc',
+                            500: '#2d6a4f',
+                            600: '#1b4332',
+                            700: '#081c15',
+                        },
+                        warm: {
+                            50: '#fffcf2',
+                            100: '#ccc5b9',
+                            200: '#403d39',
+                            300: '#252422',
+                            accent: '#eb5e28',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #fffcf2;
+            color: #403d39;
+            font-family: "Be Vietnam Pro", "Inter", sans-serif;
+        }
+        .card-shadow {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d6a4f;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #1b4332;
+        }
+    </style>
+
+    <!-- Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sonner@1.4.0/dist/index.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef } = React;
+        const { 
+            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+            LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
+        } = Recharts;
+        const { motion, AnimatePresence } = FramerMotion;
+        const { Toaster, toast } = Sonner;
+
+        // --- Lucide Icons Wrapper ---
+        const Icon = ({ name, className, size = 24 }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (iconRef.current) {
+                    const icon = lucide.icons[name];
+                    if (icon) {
+                        lucide.createIcons({
+                            icons: { [name]: icon },
+                            nameAttr: 'data-lucide'
+                        });
+                    }
+                }
+            }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }} ref={iconRef}></i>;
+        };
+
+        const cn = (...inputs) => inputs.filter(Boolean).join(' ');
+
+        // --- Mock Data ---
+        const MOCK_RANKS = [
+            { id: 'r1', name: 'Đồng', minPoints: 0, discountPercent: 0, color: 'bg-gray-100 text-gray-600' },
+            { id: 'r2', name: 'Bạc', minPoints: 500, discountPercent: 2, color: 'bg-blue-50 text-blue-600' },
+            { id: 'r3', name: 'Vàng', minPoints: 1000, discountPercent: 5, color: 'bg-yellow-50 text-yellow-700' },
+            { id: 'r4', name: 'Kim Cương', minPoints: 2000, discountPercent: 10, color: 'bg-purple-50 text-purple-600' },
+        ];
+
+        const MOCK_PRODUCTS = [
+            { id: '1', name: 'Gạo ST25 (5kg)', category: 'Lương thực', importPrice: 150000, salePrice: 185000, stock: 20, unit: 'Túi' },
+            { id: '2', name: 'Nước mắm Nam Ngư', category: 'Gia vị', importPrice: 35000, salePrice: 42000, stock: 50, unit: 'Chai' },
+            { id: '3', name: 'Dầu ăn Tường An 1L', category: 'Gia vị', importPrice: 40000, salePrice: 48000, stock: 30, unit: 'Chai' },
+            { id: '4', name: 'Mì Hảo Hảo Tôm Chua Cay', category: 'Thực phẩm khô', importPrice: 3200, salePrice: 4000, stock: 200, unit: 'Gói' },
+            { id: '5', name: 'Sữa đặc Ông Thọ', category: 'Sữa', importPrice: 22000, salePrice: 26000, stock: 40, unit: 'Lon' },
+        ];
+
+        const MOCK_CUSTOMERS = [
+            { id: 'c1', name: 'Cô Lan', phone: '0901234567', points: 1250, rankId: 'r3', totalSpent: 12500000, frequentItems: ['Gạo ST25', 'Nước mắm'] },
+            { id: 'c2', name: 'Chú Hùng', phone: '0912345678', points: 850, rankId: 'r2', totalSpent: 8500000, frequentItems: ['Dầu ăn', 'Mì gói'] },
+            { id: 'c3', name: 'Chị Mai', phone: '0987654321', points: 2100, rankId: 'r4', totalSpent: 21000000, frequentItems: ['Sữa đặc', 'Bánh kẹo'] },
+        ];
+
+        // --- Components ---
+
+        const Modal = ({ isOpen, onClose, title, children }) => (
+            <AnimatePresence>
+                {isOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                                <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+                                <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors"><Icon name="X" className="text-gray-500" /></button>
+                            </div>
+                            <div className="p-6 max-h-[80vh] overflow-y-auto">{children}</div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+        );
+
+        const StatCard = ({ title, value, subValue, icon, trend, color }) => (
+            <div className="bg-white p-6 rounded-2xl card-shadow border border-gray-100">
+                <div className="flex justify-between items-start mb-4">
+                    <div className={cn("p-3 rounded-xl", color)}><Icon name={icon} className="text-white" /></div>
+                    {trend && (
+                        <span className={cn("flex items-center text-sm font-medium px-2 py-1 rounded-lg", trend > 0 ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600")}>
+                            <Icon name={trend > 0 ? "ArrowUpRight" : "ArrowDownRight"} size={16} className="mr-1" />{Math.abs(trend)}%
+                        </span>
+                    )}
+                </div>
+                <h3 className="text-gray-500 text-sm font-medium mb-1">{title}</h3>
+                <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-gray-900">{value}</span>{subValue && <span className="text-sm text-gray-400">{subValue}</span>}</div>
+            </div>
+        );
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [products, setProducts] = useState(MOCK_PRODUCTS);
+            const [customers, setCustomers] = useState(MOCK_CUSTOMERS);
+            const [orders, setOrders] = useState([]);
+            const [promotions, setPromotions] = useState([]);
+            const [membershipRanks, setMembershipRanks] = useState(MOCK_RANKS);
+            const [cart, setCart] = useState([]);
+            const [selectedCustomer, setSelectedCustomer] = useState(null);
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [activeModal, setActiveModal] = useState(null);
+            const [editingItem, setEditingItem] = useState(null);
+            const [searchQuery, setSearchQuery] = useState('');
+
+            useEffect(() => {
+                const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            const getEffectivePrice = (product) => {
+                const activePromos = promotions.filter(p => p.isActive && (p.type === 'product' ? p.targetId === product.id : p.targetId === product.category));
+                if (activePromos.length === 0) return { price: product.salePrice, discount: 0 };
+                const bestDiscount = Math.max(...activePromos.map(p => p.discountPercent));
+                const discountAmount = (product.salePrice * bestDiscount) / 100;
+                return { price: product.salePrice - discountAmount, discount: discountAmount };
+            };
+
+            const addToCart = (product) => {
+                const existing = cart.find(item => item.productId === product.id);
+                if (existing && existing.quantity >= product.stock) {
+                    toast.error(`Sản phẩm "${product.name}" đã đạt giới hạn tồn kho`);
+                    return;
+                }
+                const { price } = getEffectivePrice(product);
+                setCart(prev => existing ? prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item) : [...prev, { productId: product.id, name: product.name, quantity: 1, price }]);
+            };
+
+            const updateCartQuantity = (productId, newQty) => {
+                const product = products.find(p => p.id === productId);
+                if (!product) return;
+                if (newQty > product.stock) {
+                    toast.error(`Chỉ còn ${product.stock} sản phẩm trong kho`);
+                    newQty = product.stock;
+                }
+                if (newQty <= 0) {
+                    setCart(prev => prev.filter(item => item.productId !== productId));
+                    return;
+                }
+                setCart(prev => prev.map(item => item.productId === productId ? { ...item, quantity: newQty } : item));
+            };
+
+            const dailyRevenue = useMemo(() => orders.reduce((sum, order) => sum + order.total, 0), [orders]);
+            const totalProfit = useMemo(() => {
+                return orders.reduce((sum, order) => {
+                    const orderProfit = order.items.reduce((pSum, item) => {
+                        const product = products.find(p => p.id === item.productId);
+                        return product ? pSum + (item.price - product.importPrice) * item.quantity : pSum;
+                    }, 0);
+                    return sum + orderProfit;
+                }, 0);
+            }, [orders, products]);
+
+            return (
+                <div className="flex h-screen bg-warm-50 overflow-hidden">
+                    <Toaster position="top-right" richColors />
+                    <aside className="w-72 bg-brand-600 text-white flex flex-col p-6 hidden lg:flex shrink-0">
+                        <div className="flex items-center gap-3 mb-12">
+                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center"><Icon name="ShoppingCart" className="text-brand-600" /></div>
+                            <h1 className="text-xl font-bold tracking-tight">Tạp Hóa Việt</h1>
+                        </div>
+                        <nav className="flex-1 space-y-2">
+                            {[
+                                { id: 'dashboard', label: 'Tổng quan', icon: 'LayoutDashboard' },
+                                { id: 'inventory', label: 'Kho hàng', icon: 'Package' },
+                                { id: 'pos', label: 'Bán hàng', icon: 'ShoppingCart' },
+                                { id: 'customers', label: 'Khách hàng', icon: 'Users' },
+                                { id: 'reports', label: 'Báo cáo', icon: 'BarChart3' },
+                            ].map(item => (
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={cn("w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-medium", activeTab === item.id ? "bg-white text-brand-600" : "text-brand-100 hover:bg-brand-500")}>
+                                    <Icon name={item.icon} size={20} /> {item.label}
+                                </button>
+                            ))}
+                        </nav>
+                    </aside>
+                    <main className="flex-1 overflow-y-auto p-4 md:p-8">
+                        <header className="flex justify-between items-center mb-8">
+                            <div><h2 className="text-sm font-bold text-brand-600 uppercase tracking-widest mb-1">{activeTab}</h2><p className="text-2xl font-bold text-gray-900">Chào buổi sáng!</p></div>
+                            <div className="bg-white p-2 rounded-xl card-shadow border border-gray-100 px-4 font-bold text-gray-900">{currentTime.toLocaleTimeString('vi-VN')}</div>
+                        </header>
+                        <AnimatePresence mode="wait">
+                            <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                                {activeTab === 'dashboard' && (
+                                    <div className="space-y-8">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                            <StatCard title="Doanh thu hôm nay" value={`${dailyRevenue.toLocaleString()}đ`} trend={12.5} color="bg-brand-500" icon="TrendingUp" />
+                                            <StatCard title="Lợi nhuận ước tính" value={`${totalProfit.toLocaleString()}đ`} trend={8.2} color="bg-orange-500" icon="BarChart3" />
+                                            <StatCard title="Đơn hàng mới" value={orders.length} color="bg-blue-500" icon="ShoppingCart" />
+                                            <StatCard title="Khách hàng" value={customers.length} color="bg-purple-500" icon="Users" />
+                                        </div>
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                            <div className="lg:col-span-2 bg-white p-6 rounded-2xl card-shadow border border-gray-100">
+                                                <h3 className="text-lg font-bold mb-6">Doanh thu theo tuần</h3>
+                                                <div className="h-80">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <BarChart data={[
+                                                            { name: 'T2', revenue: 1200000 }, { name: 'T3', revenue: 1500000 }, { name: 'T4', revenue: 900000 },
+                                                            { name: 'T5', revenue: 2100000 }, { name: 'T6', revenue: 1800000 }, { name: 'T7', revenue: 3200000 }, { name: 'CN', revenue: 2800000 },
+                                                        ]}>
+                                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                                            <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                                                            <YAxis axisLine={false} tickLine={false} tickFormatter={(v) => `${v/1000000}M`} />
+                                                            <Tooltip formatter={(v) => [`${v.toLocaleString()}đ`, 'Doanh thu']} />
+                                                            <Bar dataKey="revenue" fill="#2d6a4f" radius={[4, 4, 0, 0]} barSize={40} />
+                                                        </BarChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white p-6 rounded-2xl card-shadow border border-gray-100">
+                                                <h3 className="text-lg font-bold mb-6">Xếp hạng thành viên</h3>
+                                                <div className="space-y-6">
+                                                    {customers.sort((a, b) => b.points - a.points).slice(0, 5).map((c, i) => (
+                                                        <div key={c.id} className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold", i === 0 ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600")}>{i + 1}</div>
+                                                                <div><p className="font-semibold text-gray-900">{c.name}</p><p className="text-xs text-gray-500">{membershipRanks.find(r => r.id === c.rankId)?.name || 'Thành viên'}</p></div>
+                                                            </div>
+                                                            <span className="text-brand-600 font-bold">{c.points.toLocaleString()} <span className="text-[10px] font-normal text-gray-400">điểm</span></span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {activeTab === 'inventory' && (
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center">
+                                            <h2 className="text-2xl font-bold text-gray-900">Kho hàng</h2>
+                                            <button className="px-4 py-2 bg-brand-500 text-white rounded-xl font-medium">Thêm sản phẩm</button>
+                                        </div>
+                                        <div className="bg-white rounded-2xl card-shadow border border-gray-100 overflow-hidden">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                                    <tr><th className="px-6 py-4">Sản phẩm</th><th className="px-6 py-4">Danh mục</th><th className="px-6 py-4 text-right">Giá bán</th><th className="px-6 py-4 text-center">Tồn kho</th></tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {products.map(p => (
+                                                        <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-6 py-4 font-medium text-gray-900">{p.name}</td>
+                                                            <td className="px-6 py-4"><span className="px-2 py-1 bg-brand-50 text-brand-600 rounded-lg text-xs">{p.category}</span></td>
+                                                            <td className="px-6 py-4 text-right font-bold text-brand-600">{p.salePrice.toLocaleString()}đ</td>
+                                                            <td className="px-6 py-4 text-center"><span className={cn("px-2 py-1 rounded-lg text-xs font-bold", p.stock < 10 ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600")}>{p.stock}</span></td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                                {activeTab === 'pos' && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[calc(100vh-200px)]">
+                                        <div className="lg:col-span-2 space-y-6 overflow-y-auto pr-2">
+                                            <div className="flex justify-between items-center">
+                                                <h2 className="text-2xl font-bold text-gray-900">Bán hàng</h2>
+                                                <div className="relative w-64">
+                                                    <Icon name="Search" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                    <input type="text" placeholder="Tìm sản phẩm..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                {products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map(p => {
+                                                    const { price: effectivePrice } = getEffectivePrice(p);
+                                                    const cartItem = cart.find(item => item.productId === p.id);
+                                                    const cartQty = cartItem ? cartItem.quantity : 0;
+                                                    const isOutOfStock = p.stock <= 0;
+                                                    const isLimitReached = cartQty >= p.stock;
+                                                    return (
+                                                        <button key={p.id} onClick={() => addToCart(p)} disabled={isOutOfStock || isLimitReached} className="bg-white p-4 rounded-2xl card-shadow border border-gray-100 text-left hover:border-brand-500 disabled:opacity-50 relative group">
+                                                            {(isOutOfStock || isLimitReached) && <div className="absolute top-2 right-2"><span className="px-2 py-0.5 rounded-full text-[8px] font-bold uppercase bg-red-100 text-red-600">{isOutOfStock ? 'Hết hàng' : 'Đã chọn hết'}</span></div>}
+                                                            <div className="font-bold text-gray-900 mb-1 group-hover:text-brand-600">{p.name}</div>
+                                                            <div className="text-xs text-gray-400 mb-3">Tồn: {p.stock} {p.unit}</div>
+                                                            <div className="flex justify-between items-center"><span className="text-brand-600 font-bold">{effectivePrice.toLocaleString()}đ</span><div className="p-1.5 bg-brand-50 text-brand-600 rounded-lg group-hover:bg-brand-500 group-hover:text-white"><Icon name="Plus" size={16} /></div></div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-2xl card-shadow border border-gray-100 flex flex-col h-full overflow-hidden">
+                                            <div className="p-6 border-b border-gray-100">
+                                                <h3 className="text-lg font-bold mb-4">Đơn hàng hiện tại</h3>
+                                                <select className="w-full p-3 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-brand-500" onChange={(e) => setSelectedCustomer(customers.find(c => c.id === e.target.value) || null)}>
+                                                    <option value="">Khách vãng lai</option>
+                                                    {customers.map(c => <option key={c.id} value={c.id}>{c.name} - {c.phone}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                                                {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-20"><Icon name="ShoppingCart" size={48} /><p className="text-sm mt-2">Chưa có sản phẩm</p></div> : 
+                                                cart.map(item => (
+                                                    <div key={item.productId} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                                        <div className="flex-1"><p className="font-semibold text-sm text-gray-900">{item.name}</p><p className="text-xs text-brand-600 font-bold">{item.price.toLocaleString()}đ</p></div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button onClick={() => updateCartQuantity(item.productId, item.quantity - 1)} className="p-1 hover:bg-white rounded-lg"><Icon name="Minus" size={12} /></button>
+                                                            <span className="w-6 text-center font-bold text-sm">{item.quantity}</span>
+                                                            <button onClick={() => updateCartQuantity(item.productId, item.quantity + 1)} className="p-1 hover:bg-white rounded-lg"><Icon name="Plus" size={12} /></button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="p-6 bg-gray-50 rounded-b-2xl space-y-4">
+                                                <div className="flex justify-between items-center text-xl font-bold text-gray-900 pt-2 border-t border-gray-200"><span>Tổng cộng</span><span className="text-brand-600">{cart.reduce((s, i) => s + i.price * i.quantity, 0).toLocaleString()}đ</span></div>
+                                                <button onClick={handleCheckout} disabled={cart.length === 0} className="w-full py-4 bg-brand-500 text-white rounded-2xl font-bold text-lg hover:bg-brand-600 shadow-lg shadow-brand-500/30 disabled:opacity-50">Thanh toán</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {activeTab === 'customers' && (
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center">
+                                            <h2 className="text-2xl font-bold text-gray-900">Quản lý khách hàng</h2>
+                                            <button className="px-4 py-2 bg-brand-500 text-white rounded-xl font-medium">Thêm khách hàng</button>
+                                        </div>
+                                        <div className="bg-white rounded-2xl card-shadow border border-gray-100 overflow-hidden">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                                    <tr><th className="px-6 py-4">Khách hàng</th><th className="px-6 py-4">Hạng</th><th className="px-6 py-4 text-right">Điểm tích lũy</th><th className="px-6 py-4 text-right">Tổng chi tiêu</th></tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {customers.map(c => (
+                                                        <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-6 py-4"><div className="font-bold text-gray-900">{c.name}</div><div className="text-xs text-gray-400">{c.phone}</div></td>
+                                                            <td className="px-6 py-4"><span className={cn("px-2 py-1 rounded-lg text-xs font-bold", membershipRanks.find(r => r.id === c.rankId)?.color)}>{membershipRanks.find(r => r.id === c.rankId)?.name}</span></td>
+                                                            <td className="px-6 py-4 text-right font-bold text-brand-600">{c.points.toLocaleString()}</td>
+                                                            <td className="px-6 py-4 text-right font-bold text-gray-900">{c.totalSpent.toLocaleString()}đ</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                                {activeTab === 'reports' && (
+                                    <div className="space-y-8">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <div className="bg-white p-6 rounded-2xl card-shadow border border-gray-100">
+                                                <h3 className="text-lg font-bold mb-6">Doanh thu theo danh mục</h3>
+                                                <div className="h-64">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <PieChart>
+                                                            <Pie data={[{ name: 'Lương thực', value: 400 }, { name: 'Gia vị', value: 300 }, { name: 'Sữa', value: 300 }]} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                                <Cell fill="#2d6a4f" /><Cell fill="#eb5e28" /><Cell fill="#403d39" />
+                                                            </Pie>
+                                                            <Tooltip />
+                                                        </PieChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white p-6 rounded-2xl card-shadow border border-gray-100">
+                                                <h3 className="text-lg font-bold mb-6">Xu hướng bán hàng</h3>
+                                                <div className="h-64">
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <AreaChart data={[{ name: 'T2', v: 400 }, { name: 'T3', v: 700 }, { name: 'T4', v: 500 }, { name: 'T5', v: 900 }, { name: 'T6', v: 800 }, { name: 'T7', v: 1200 }, { name: 'CN', v: 1100 }]}>
+                                                            <Area type="monotone" dataKey="v" stroke="#2d6a4f" fill="#dcf0dc" />
+                                                            <XAxis dataKey="name" hide />
+                                                            <Tooltip />
+                                                        </AreaChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        </AnimatePresence>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
