@@ -173,6 +173,29 @@
             const [activeModal, setActiveModal] = useState(null);
             const [editingItem, setEditingItem] = useState(null);
             const [searchQuery, setSearchQuery] = useState('');
+            // Thêm đoạn này vào bên trong function App()
+const handleCheckout = () => {
+    if (cart.length === 0) return;
+    
+    const newOrder = {
+        id: Date.now().toString(),
+        items: [...cart],
+        total: cart.reduce((s, i) => s + i.price * i.quantity, 0),
+        customer: selectedCustomer?.name || 'Khách vãng lai',
+        date: new Date()
+    };
+
+    setOrders(prev => [newOrder, ...prev]);
+    
+    // Cập nhật lại tồn kho
+    setProducts(prev => prev.map(p => {
+        const itemInCart = cart.find(item => item.productId === p.id);
+        return itemInCart ? { ...p, stock: p.stock - itemInCart.quantity } : p;
+    }));
+
+    setCart([]);
+    toast.success("Thanh toán thành công!");
+};
 
             useEffect(() => {
                 const timer = setInterval(() => setCurrentTime(new Date()), 1000);
